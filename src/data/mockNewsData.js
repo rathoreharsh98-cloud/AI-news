@@ -407,6 +407,85 @@ export const INITIAL_STORIES = [
       safeHarbourCompliant: true,
       legalSection: 'Section 79 IT Act Disaster Telemetry Broadcast'
     }
+  },
+  {
+    id: 'story-006',
+    title: 'BGP Routing Anomaly & Subsea Fiber Telemetry Drop Detected Near Mumbai Landing Station',
+    category: 'Cyber & AI Security',
+    urgency: 'HIGH',
+    timestamp: '12 minutes ago',
+    utcTimestamp: '2026-11-22T22:15:00Z',
+    location: {
+      name: 'Mumbai Subsea Cable Corridor / Arabian Sea',
+      lat: 18.938,
+      lng: 72.835,
+      country: 'India'
+    },
+    summary: 'Automated border gateway protocol (BGP) monitors detected a 42% latency surge and route rerouting across three West-Coast submarine fiber optic gateways. CERT-In advisory confirms traffic failover to redundant terrestrial paths.',
+    biasDistribution: {
+      left: 31,
+      center: 54,
+      right: 15
+    },
+    blindspots: 'Covered heavily by technical cybersecurity and telecom wires; minimal mainstream broadcast coverage.',
+    corroborationScore: 91,
+    status: 'CORROBORATED',
+    entities: {
+      who: ['CERT-In', 'Cloudflare Radar / BGPStream', 'Mumbai Submarine Cable Landing Station'],
+      what: 'Subsea fiber gateway packet loss and autonomous BGP traffic rerouting',
+      where: 'Mumbai Coastal Sector (18.938° N, 72.835° E)',
+      when: '2026-11-22 22:15 UTC'
+    },
+    parallelVerification: {
+      mainstreamWire: [
+        {
+          source: 'Reuters Technology Wire',
+          bias: 'Center',
+          reliability: 98,
+          verdict: 'Corroborates',
+          quote: 'Telecom operators confirm automatic BGP failover engaged following subsea repeater power fluctuation off western India.',
+          link: 'https://reuters.com'
+        },
+        {
+          source: 'Bloomberg Telecom Desk',
+          bias: 'Center',
+          reliability: 96,
+          verdict: 'Corroborates',
+          quote: 'Enterprise cloud traffic between Europe and Mumbai rerouted via Chennai-Singapore links with +38ms latency impact.',
+          link: 'https://bloomberg.com'
+        }
+      ],
+      socialPulse: [
+        {
+          source: 'Reddit r/networking & NOC Engineers',
+          authorType: 'Network Operators (PII Scrubbed)',
+          piiScrubbed: true,
+          signalStrength: 'High',
+          time: '10m ago',
+          content: 'Looking glass probes in West India showing AS-path prepending and packet loss drop after automatic reroute.'
+        }
+      ],
+      osintTelemetry: [
+        {
+          system: 'Global BGP Routing Table & IODA Telemetry',
+          status: 'MATCHED',
+          icon: 'Activity',
+          details: '142 autonomous system (AS) prefixes shifted transit paths at 22:11:04 UTC; zero total blackout observed.'
+        },
+        {
+          system: 'Maritime AIS Cable Protection Zone',
+          status: 'NORMAL',
+          icon: 'Ship',
+          details: 'No commercial vessels anchored within 2nm of Mumbai submarine cable exclusion zone.'
+        }
+      ]
+    },
+    legalSafeguards: {
+      provenanceStatement: 'Corroborated: Verified across public BGP routing tables (RIPE RIS / RouteViews) and 2 independent telecom wire agencies pursuant to IT Act Section 79.',
+      piiScrubbed: true,
+      safeHarbourCompliant: true,
+      legalSection: 'Section 79 IT Act & BNS Section 356 Network Telemetry Report'
+    }
   }
 ];
 

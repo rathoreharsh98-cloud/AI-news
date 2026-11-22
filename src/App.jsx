@@ -45,7 +45,8 @@ export default function App() {
     'Maritime & Defense',
     'Aviation & Conflict',
     'Natural Disasters',
-    'Energy & Infrastructure'
+    'Energy & Infrastructure',
+    'Cyber & AI Security'
   ];
 
   const filteredStories = stories.filter((story) => {
