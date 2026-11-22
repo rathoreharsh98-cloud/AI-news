@@ -70,6 +70,17 @@ describe('Integration Test: Parallel 3-Layer Cross-Check Engine (TSK-103)', () =
       assert.ok(dossier.legalSafeguards.provenanceStatement.includes('Bharatiya Nyaya Sanhita (BNS) Section 356'));
       assert.ok(dossier.legalSafeguards.provenanceStatement.includes('Disputed:'));
     });
+
+    test('should route Tsunami hoax claims to NOAA DART Buoy contradiction and DISPUTED status (Module 4)', async () => {
+      const claim = 'Massive tsunami wave destroys coastal harbor in Mumbai';
+      const dossier = await executeVerificationPipeline(claim, 'Mumbai');
+
+      assert.equal(dossier.status, 'DISPUTED');
+      assert.ok(dossier.corroborationScore < 40, `Expected score < 40, got ${dossier.corroborationScore}`);
+      assert.equal(dossier.location.country, 'India');
+      assert.ok(dossier.parallelVerification.osintTelemetry.some(t => t.system.includes('NOAA DART Tsunami Buoy')));
+      assert.equal(dossier.parallelVerification.osintTelemetry[0].status, 'CONTRADICTED');
+    });
   });
 
   describe('Parallel 3-Layer Schema & Contract Conformance', () => {

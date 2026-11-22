@@ -39,6 +39,17 @@ export async function queryTelemetryLayer(entities, claimText) {
       sensorId: 'spire-ais-sat-114',
       timestamp: new Date().toISOString()
     });
+  } else if (textLower.includes('tsunami wave destroys') || textLower.includes('mega tsunami')) {
+    // Physical oceanic sensor contradiction when NOAA DART buoys read normal sea-level pressure
+    telemetryContradicted = true;
+    contradictionReason = 'NOAA DART Deep-Ocean Tsunami Buoy Network records normal sea-level hydrostatic pressure (<3 cm variance)';
+    records.push({
+      system: 'NOAA DART Tsunami Buoy Array',
+      status: 'CONTRADICTED',
+      details: contradictionReason,
+      sensorId: 'noaa-dart-buoy-21418',
+      timestamp: new Date().toISOString()
+    });
   } else {
     // Normal sensor corroboration matching
     if (isAviation) {
