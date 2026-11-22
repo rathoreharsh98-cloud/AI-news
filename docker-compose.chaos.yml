@@ -1,0 +1,30 @@
+version: '3.8'
+
+# ==============================================================================
+# VERITAS OSINT - Netflix Chaos Engineering Orchestration
+# Used for automated fault injection, network partition simulation, and resilience testing
+# ==============================================================================
+
+services:
+  # Base microservice stack inherits from docker-compose.yml
+  chaos-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    container_name: veritas-chaos-runner
+    environment:
+      - NODE_ENV=test
+      - TELEMETRY_INGEST_URL=http://telemetry-ingestion:8082
+    command: ["node", "scripts/chaos-resilience-test.js"]
+    networks:
+      - core-backend-net
+    depends_on:
+      veritas-api-gateway:
+        condition: service_healthy
+      telemetry-ingestion:
+        condition: service_healthy
+
+networks:
+  core-backend-net:
+    external: true

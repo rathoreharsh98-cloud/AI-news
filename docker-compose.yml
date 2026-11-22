@@ -1,0 +1,268 @@
+version: '3.8'
+
+# ==============================================================================
+# VERITAS OSINT - Clean-Room Microservice Orchestration
+# Benchmark: Google SRE (Resilience & Least Privilege) & Martin Fowler Distributed Systems
+# AGPL-3.0 Clean-Room Air Gap: Isolated via 'cleanroom-agpl-net' network boundary
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Tactical HUD Frontend (React + Hardened Nginx)
+  # ----------------------------------------------------------------------------
+  veritas-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
+    container_name: veritas-osint-web
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    environment:
+      - NODE_ENV=production
+      - API_GATEWAY_URL=http://veritas-api-gateway:8081
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    tmpfs:
+      - /var/cache/nginx:size=64M,uid=101,gid=101
+      - /var/run:size=16M,uid=101,gid=101
+      - /var/log/nginx:size=32M,uid=101,gid=101
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 256M
+        reservations:
+          cpus: '0.20'
+          memory: 64M
+    networks:
+      - frontend-net
+    depends_on:
+      veritas-api-gateway:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # 2. VERITAS Core API Gateway & Verification Engine
+  # ----------------------------------------------------------------------------
+  veritas-api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    container_name: veritas-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - NODE_ENV=production
+      - PORT=8081
+      - REDIS_URL=redis://redis-telemetry-cache:6379
+      - TELEMETRY_INGEST_URL=http://telemetry-ingestion:8082
+      - QDRANT_URL=http://qdrant-vector:6333
+      - RATE_LIMIT_WINDOW_MS=60000
+      - RATE_LIMIT_MAX_REQUESTS=120
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8081/healthz').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 512M
+        reservations:
+          cpus: '0.50'
+          memory: 128M
+    networks:
+      - frontend-net
+      - core-backend-net
+    depends_on:
+      redis-telemetry-cache:
+        condition: service_healthy
+      telemetry-ingestion:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # 3. Streaming Telemetry Ingestion Worker
+  # ----------------------------------------------------------------------------
+  telemetry-ingestion:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: telemetry
+    container_name: veritas-telemetry-ingestion
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - NODE_ENV=production
+      - PORT=8082
+      - AGPL_SIDECAR_URL=http://worldmonitor-cleanroom-adapter:8091
+      - REDIS_URL=redis://redis-telemetry-cache:6379
+      - STREAM_POLL_INTERVAL_MS=5000
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8082/healthz').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 384M
+        reservations:
+          cpus: '0.25'
+          memory: 96M
+    networks:
+      - core-backend-net
+      - cleanroom-agpl-net
+    depends_on:
+      worldmonitor-cleanroom-adapter:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # 4. Clean-Room AGPL-3.0 Sidecar Adapter (Stateless Network Proxy)
+  # ----------------------------------------------------------------------------
+  worldmonitor-cleanroom-adapter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: sidecar
+    container_name: veritas-agpl-sidecar
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=8091
+      - MOCK_TELEMETRY=true
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8091/healthz').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+    networks:
+      # Strictly isolated: zero connection to frontend-net or persistent databases
+      - cleanroom-agpl-net
+
+  # ----------------------------------------------------------------------------
+  # 5. In-Memory Telemetry & Dossier Cache (Redis 7)
+  # ----------------------------------------------------------------------------
+  redis-telemetry-cache:
+    image: redis:7.2-alpine
+    container_name: veritas-redis-cache
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    ports:
+      - "6379:6379"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+      start_period: 3s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+    networks:
+      - core-backend-net
+
+  # ----------------------------------------------------------------------------
+  # 6. Vector Database Cluster (Qdrant Semantic Deduplication)
+  # ----------------------------------------------------------------------------
+  qdrant-vector:
+    image: qdrant/qdrant:v1.12.1
+    container_name: veritas-qdrant-vector
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__STORAGE__PERFORMANCE__MAX_SEARCH_THREADS=4
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:6333/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 512M
+    networks:
+      - core-backend-net
+
+  # ----------------------------------------------------------------------------
+  # 7. Telemetry & SRE Observability (Prometheus)
+  # ----------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: veritas-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:9090/-/healthy"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+    networks:
+      - core-backend-net
+
+# ------------------------------------------------------------------------------
+# Air-Gapped Network Topology
+# ------------------------------------------------------------------------------
+networks:
+  frontend-net:
+    driver: bridge
+    internal: false
+  core-backend-net:
+    driver: bridge
+    internal: false
+  cleanroom-agpl-net:
+    driver: bridge
+    # Air-gapped network isolating AGPL sidecar from frontend and core storage
+    internal: true

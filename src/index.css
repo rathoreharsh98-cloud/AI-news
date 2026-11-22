@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg-base: #080b11;
+  --color-bg-card: #0f1420;
+  --color-bg-subtle: #141b2d;
+  --color-border-subtle: #1e293b;
+  --color-border-focus: #00f0ff;
+  --color-status-corroborated: #00ff66;
+  --color-status-developing: #ffb703;
+  --color-status-disputed: #ff3366;
+  --color-bias-left: #3b82f6;
+  --color-bias-center: #a855f7;
+  --color-bias-right: #f43f5e;
+}
+
+@layer base {
+  body {
+    background-color: #080b11;
+    color: #e2e8f0;
+    overflow-x: hidden;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Accessible focus indicators meeting WCAG 2.2 AA standard */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px #080b11, 0 0 0 4px #00f0ff;
+  }
+}
+
+/* Tabular nums for all monospace data tickers */
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom Tactical & OSINT styling */
+.scanline-bg {
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
+  ), linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.03),
+    rgba(0, 255, 0, 0.01),
+    rgba(0, 0, 255, 0.03)
+  );
+  background-size: 100% 3px, 3px 100%;
+}
+
+.radar-sweep {
+  position: relative;
+  overflow: hidden;
+}
+
+.radar-sweep::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: conic-gradient(from 0deg at 50% 50%, rgba(0, 240, 255, 0.15) 0deg, transparent 60deg, transparent 360deg);
+  border-radius: 50%;
+  animation: radar-rotate 4s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes radar-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Leaflet dark custom tiles and popup overrides */
+.leaflet-container {
+  background-color: #0b0f17 !important;
+  font-family: inherit;
+}
+
+.leaflet-popup-content-wrapper {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0.75rem !important;
+}
+
+.leaflet-popup-tip {
+  background: #0f1420 !important;
+  border: 1px solid #1e293b !important;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #080b11;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00f0ff88;
+}
