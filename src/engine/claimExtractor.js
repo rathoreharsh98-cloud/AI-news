@@ -111,6 +111,19 @@ const GAZETTEER = [
       geohash: '6s5x'
     },
     defaultCategory: 'Natural Disasters'
+  },
+  {
+    keywords: ['mumbai', 'arabian sea', 'nhava sheva', 'india', 'bgp'],
+    location: {
+      name: 'Mumbai / Arabian Sea Port Sector',
+      lat: 18.938,
+      lng: 72.835,
+      country: 'India',
+      sector: 'Western Indian Ocean Subsea & Maritime Gateway',
+      boundingBox: [18.0, 71.5, 19.8, 73.5],
+      geohash: 'te7u'
+    },
+    defaultCategory: 'Cyber & AI Security'
   }
 ];
 

@@ -112,6 +112,7 @@ export function formatTimeAgo(epochMs) {
 // Global Strategic Region Coordinates for 1-Click Navigation
 export const STRATEGIC_REGIONS = [
   { id: 'global', name: 'Whole Earth', center: [20.0, 30.0], zoom: 2, icon: 'Globe' },
+  { id: 'arabiansea', name: 'Arabian Sea & India', center: [18.938, 72.835], zoom: 6, icon: 'Navigation' },
   { id: 'redsea', name: 'Red Sea & Gulf', center: [13.2, 44.5], zoom: 6, icon: 'Anchor' },
   { id: 'taiwan', name: 'Taiwan & E. Asia', center: [24.0, 122.0], zoom: 7, icon: 'Crosshair' },
   { id: 'blacksea', name: 'Black Sea & Europe', center: [43.5, 33.0], zoom: 6, icon: 'Shield' },
