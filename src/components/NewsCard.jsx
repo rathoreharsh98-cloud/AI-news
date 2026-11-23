@@ -9,10 +9,11 @@ import {
   Scale, 
   ShieldCheck,
   Zap,
-  Radio
+  Radio,
+  Bookmark
 } from 'lucide-react';
 
-export default function NewsCard({ story, isSelected, onSelect }) {
+export default function NewsCard({ story, isSelected, onSelect, isSaved = false, onToggleSave }) {
   const getStatusBadge = () => {
     switch (story.status) {
       case 'CORROBORATED':
@@ -90,13 +91,39 @@ export default function NewsCard({ story, isSelected, onSelect }) {
       <div className="flex items-center justify-between gap-2 mb-2.5">
         <div className="flex items-center gap-2 flex-wrap">
           {getStatusBadge()}
+          {story.isLiveGdelt && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/40">
+              <Radio className="w-3 h-3 animate-pulse" aria-hidden="true" />
+              LIVE GDELT
+            </span>
+          )}
           <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/80">
             {story.category}
           </span>
         </div>
-        <div className="flex items-center gap-1.5 text-xs font-mono text-slate-400">
-          <Clock className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-          <time dateTime={story.utcTimestamp || ''}>{story.timestamp}</time>
+        <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+          <span className="flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+            <time dateTime={story.utcTimestamp || ''}>{story.timestamp}</time>
+          </span>
+          {onToggleSave && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSave(story.id);
+              }}
+              aria-label={isSaved ? 'Remove dossier from saved' : 'Bookmark dossier'}
+              title={isSaved ? 'Saved dossier (click to remove)' : 'Save dossier'}
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                isSaved
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-amber-300 hover:border-slate-700'
+              }`}
+            >
+              <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-amber-400 text-amber-400' : ''}`} />
+            </button>
+          )}
         </div>
       </div>
 

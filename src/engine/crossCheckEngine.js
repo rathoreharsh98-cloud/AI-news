@@ -43,10 +43,11 @@ export async function executeVerificationPipeline(claimText, optionalRegion = nu
   // STEP 3: Parallel 3-Layer Cross-Check
   // ----------------------------------------------------
   const t2 = performance.now();
+  const layerOptions = { liveMode: Boolean(options.liveMode) };
   const [wireSettled, socialSettled, telemetrySettled] = await Promise.allSettled([
-    queryWireLayer(entities, claimText),
-    querySocialLayer(entities, claimText),
-    queryTelemetryLayer(entities, claimText)
+    queryWireLayer(entities, claimText, layerOptions),
+    querySocialLayer(entities, claimText, layerOptions),
+    queryTelemetryLayer(entities, claimText, layerOptions)
   ]);
 
   const wireResult = wireSettled.status === 'fulfilled' ? wireSettled.value : {
@@ -88,7 +89,8 @@ export async function executeVerificationPipeline(claimText, optionalRegion = nu
     wireResult,
     socialResult,
     telemetryResult,
-    corroborationResult
+    corroborationResult,
+    geminiApiKey: options.geminiApiKey || null
   });
   stepLatencies.consensusMs = Math.round(performance.now() - t3);
 

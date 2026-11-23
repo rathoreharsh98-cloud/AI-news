@@ -22,10 +22,11 @@ import {
   Layers,
   Sparkles,
   Calculator,
-  Check
+  Check,
+  Bookmark
 } from 'lucide-react';
 
-export default function VerificationDossier({ story, onClose, onPanToLocation }) {
+export default function VerificationDossier({ story, onClose, onPanToLocation, isSaved = false, onToggleSave }) {
   const [activeTab, setActiveTab] = useState('dossier'); // 'dossier' | 'evidence' | 'copilot'
   const [chatMessages, setChatMessages] = useState([
     {
@@ -129,6 +130,21 @@ export default function VerificationDossier({ story, onClose, onPanToLocation })
           </div>
 
           <div className="flex items-center gap-2">
+            {onToggleSave && (
+              <button
+                type="button"
+                onClick={() => onToggleSave(story.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-mono transition-colors cursor-pointer ${
+                  isSaved
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 font-bold'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
+                aria-label={isSaved ? 'Remove bookmark' : 'Bookmark dossier'}
+              >
+                <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-amber-400 text-amber-400' : 'text-amber-400'}`} aria-hidden="true" />
+                <span className="hidden sm:inline">{isSaved ? 'Saved' : 'Save'}</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={downloadJsonDossier}

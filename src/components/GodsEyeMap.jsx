@@ -26,7 +26,7 @@ import {
   ShieldCheck,
   RefreshCw
 } from 'lucide-react';
-import { fetchLiveEarthquakes, STRATEGIC_REGIONS, MAP_STYLES } from '../services/mapDataService';
+import { fetchLiveEarthquakes, fetchLiveDisasters, fetchLiveFlights, STRATEGIC_REGIONS, MAP_STYLES } from '../services/mapDataService';
 
 export default function GodsEyeMap({ stories, selectedStory, onSelectStory }) {
   const mapContainerRef = useRef(null);
@@ -43,6 +43,7 @@ export default function GodsEyeMap({ stories, selectedStory, onSelectStory }) {
   const [inspectedNode, setInspectedNode] = useState(null); // node currently clicked and inspected
   const [cursorCoords, setCursorCoords] = useState({ lat: 25.0, lng: 45.0 });
   const [isLegendOpen, setIsLegendOpen] = useState(false);
+  const [isLayersOpen, setIsLayersOpen] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Layer Visibility
@@ -54,8 +55,10 @@ export default function GodsEyeMap({ stories, selectedStory, onSelectStory }) {
     satelliteThermal: true
   });
 
-  // Dynamic Telemetry State (Populated from Live USGS API + Real Strategic Tracks)
+  // Dynamic Telemetry State (Populated from Live USGS, NASA EONET, & OpenSky APIs)
   const [liveSeismic, setLiveSeismic] = useState([]);
+  const [liveDisasters, setLiveDisasters] = useState([]);
+  const [liveFlights, setLiveFlights] = useState([]);
 
   // Base telemetry data around major global straits and transit corridors
   const baseTelemetry = [
@@ -176,16 +179,27 @@ export default function GodsEyeMap({ stories, selectedStory, onSelectStory }) {
     }
   ];
 
-  // Ingest Live USGS API on Component Mount
-  const loadLiveEarthquakes = async () => {
+  // Ingest Live USGS, NASA EONET, and OpenSky APIs on Component Mount
+  const loadLiveTelemetry = async () => {
     setIsRefreshing(true);
-    const quakes = await fetchLiveEarthquakes();
-    setLiveSeismic(quakes);
-    setIsRefreshing(false);
+    try {
+      const [quakes, disasters, flights] = await Promise.all([
+        fetchLiveEarthquakes(),
+        fetchLiveDisasters(),
+        fetchLiveFlights()
+      ]);
+      setLiveSeismic(quakes);
+      setLiveDisasters(disasters);
+      setLiveFlights(flights);
+    } catch (err) {
+      console.error('Failed to load live telemetry:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   useEffect(() => {
-    loadLiveEarthquakes();
+    loadLiveTelemetry();
   }, []);
 
   // Initialize Map
@@ -371,60 +385,139 @@ export default function GodsEyeMap({ stories, selectedStory, onSelectStory }) {
       });
     }
 
-    // 3. Render Base Telemetry (Flights, Vessels, Thermal)
-    baseTelemetry.forEach((item) => {
-      if (item.type === 'flight' && !activeLayers.adsbFlights) return;
-      if (item.type === 'vessel' && !activeLayers.maritimeAis) return;
-      if (item.type === 'thermal' && !activeLayers.satelliteThermal) return;
+    // 3. Render Live NASA EONET Hazards & Thermal
+    if (activeLayers.satelliteThermal) {
+      liveDisasters.forEach((disaster) => {
+        let iconColor = '#f97316'; // wildfire orange
+        let iconSymbol = '🔥';
+        if (disaster.disasterType?.includes('volcano')) {
+          iconColor = '#ef4444';
+          iconSymbol = '🌋';
+        } else if (disaster.disasterType?.includes('storm')) {
+          iconColor = '#a855f7';
+          iconSymbol = '🌀';
+        } else if (disaster.disasterType?.includes('flood')) {
+          iconColor = '#06b6d4';
+          iconSymbol = '🌊';
+        }
 
-      let iconColor = '#38bdf8';
-      let iconSymbol = '✈';
-      if (item.type === 'vessel') {
-        iconColor = '#0284c7';
-        iconSymbol = '⚓';
-      } else if (item.type === 'thermal') {
-        iconColor = '#ef4444';
-        iconSymbol = '▲';
-      }
-
-      const telemIcon = L.divIcon({
-        className: 'telemetry-icon',
-        html: `
-          <div style="
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 24px;
-            height: 24px;
-            background: #0f1420f5;
-            border: 1.5px solid ${iconColor};
-            border-radius: 6px;
-            color: ${iconColor};
-            font-size: 12px;
-            box-shadow: 0 0 10px ${iconColor}50;
-            cursor: pointer;
-          ">
-            ${iconSymbol}
-          </div>
-        `,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
-      });
-
-      const telemMarker = L.marker([item.lat, item.lng], { icon: telemIcon });
-
-      telemMarker.on('click', () => {
-        setInspectedNode({
-          kind: 'telemetry',
-          type: item.type,
-          data: item
+        const disIcon = L.divIcon({
+          className: 'disaster-icon',
+          html: `
+            <div style="
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 26px;
+              height: 26px;
+              background: #0f1420f5;
+              border: 1.5px solid ${iconColor};
+              border-radius: 8px;
+              color: ${iconColor};
+              font-size: 13px;
+              box-shadow: 0 0 12px ${iconColor}60;
+              cursor: pointer;
+            ">
+              ${iconSymbol}
+            </div>
+          `,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13]
         });
+
+        const disMarker = L.marker([disaster.lat, disaster.lng], { icon: disIcon });
+        disMarker.on('click', () => {
+          setInspectedNode({
+            kind: 'telemetry',
+            type: 'disaster',
+            data: disaster
+          });
+        });
+        telemetryLayerRef.current.addLayer(disMarker);
       });
+    }
 
-      telemetryLayerRef.current.addLayer(telemMarker);
-    });
+    // 4. Render ADS-B Flights (Live OpenSky + Strategic Corridors)
+    if (activeLayers.adsbFlights) {
+      const flightsToRender = liveFlights.length > 0 ? liveFlights : baseTelemetry.filter(t => t.type === 'flight');
+      flightsToRender.forEach((flight) => {
+        const iconColor = flight.contestedZone ? '#f59e0b' : '#38bdf8';
+        const flightIcon = L.divIcon({
+          className: 'flight-icon',
+          html: `
+            <div style="
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 24px;
+              height: 24px;
+              background: #0f1420f5;
+              border: 1.5px solid ${iconColor};
+              border-radius: 6px;
+              color: ${iconColor};
+              font-size: 12px;
+              box-shadow: 0 0 10px ${iconColor}50;
+              cursor: pointer;
+            ">
+              ✈
+            </div>
+          `,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
 
-  }, [stories, activeLayers, liveSeismic, selectedStory]);
+        const fMarker = L.marker([flight.lat, flight.lng], { icon: flightIcon });
+        fMarker.on('click', () => {
+          setInspectedNode({
+            kind: 'telemetry',
+            type: 'flight',
+            data: flight
+          });
+        });
+        telemetryLayerRef.current.addLayer(fMarker);
+      });
+    }
+
+    // 5. Render Maritime AIS Vessels
+    if (activeLayers.maritimeAis) {
+      baseTelemetry.filter(t => t.type === 'vessel').forEach((vessel) => {
+        const vIcon = L.divIcon({
+          className: 'vessel-icon',
+          html: `
+            <div style="
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 24px;
+              height: 24px;
+              background: #0f1420f5;
+              border: 1.5px solid #0284c7;
+              border-radius: 6px;
+              color: #0284c7;
+              font-size: 12px;
+              box-shadow: 0 0 10px rgba(2, 132, 199, 0.5);
+              cursor: pointer;
+            ">
+              ⚓
+            </div>
+          `,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+
+        const vMarker = L.marker([vessel.lat, vessel.lng], { icon: vIcon });
+        vMarker.on('click', () => {
+          setInspectedNode({
+            kind: 'telemetry',
+            type: 'vessel',
+            data: vessel
+          });
+        });
+        telemetryLayerRef.current.addLayer(vMarker);
+      });
+    }
+
+  }, [stories, activeLayers, liveSeismic, liveDisasters, liveFlights, selectedStory]);
 
   // Handle Strategic Region Jump
   const handleJumpToRegion = (region) => {
@@ -549,20 +642,41 @@ export default function GodsEyeMap({ stories, selectedStory, onSelectStory }) {
           </button>
         </div>
 
-        {/* Live USGS Feed Badge */}
+        {/* Live Telemetry Status Badge */}
         <div className="bg-[#0f1420]/90 backdrop-blur-md border border-slate-800 px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-2 text-xs font-mono text-slate-300">
           <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-          <span className="text-[11px] text-slate-400">Live Feeds:</span>
-          <span className="text-emerald-400 font-bold">{liveSeismic.length} Real Quakes Active</span>
+          <span className="text-[11px] text-slate-400">Live Telemetry:</span>
+          <span className="text-emerald-400 font-bold">
+            {liveSeismic.length} Quakes • {liveDisasters.length} Hazards • {liveFlights.length} Flights
+          </span>
+          <button 
+            onClick={loadLiveTelemetry}
+            disabled={isRefreshing}
+            className="ml-1 p-1 hover:bg-slate-800 rounded transition-colors text-cyan-400 cursor-pointer"
+            title="Refresh real-time feeds"
+          >
+            <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </div>
 
-      {/* Top Right: Layer Visibility Toggle Panel */}
+      {/* Top Right: Layer Visibility Toggle Panel (Collapsible for Mobile/iPad Touch Ergonomics) */}
       <div className="absolute top-14 right-3 z-[1000] flex flex-col gap-1.5 bg-[#0f1420]/95 backdrop-blur-md border border-slate-800 p-2.5 rounded-xl shadow-xl text-xs font-mono pointer-events-auto">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 mb-1 border-b border-slate-800 pb-1">
-          <Layers className="w-3.5 h-3.5 text-cyan-400" />
-          <span>DATA LAYERS</span>
-        </div>
+        <button
+          type="button"
+          onClick={() => setIsLayersOpen(!isLayersOpen)}
+          className="flex items-center justify-between gap-2 text-[11px] font-semibold text-slate-300 hover:text-white cursor-pointer min-h-[28px]"
+          aria-expanded={isLayersOpen}
+        >
+          <span className="flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5 text-cyan-400" />
+            <span>DATA LAYERS</span>
+          </span>
+          <span className="text-[10px] text-cyan-400">{isLayersOpen ? '−' : '+'}</span>
+        </button>
+
+        {isLayersOpen && (
+          <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-800">
 
         <button
           onClick={() => toggleLayer('newsPins')}
@@ -585,7 +699,7 @@ export default function GodsEyeMap({ stories, selectedStory, onSelectStory }) {
           <span className="flex items-center gap-1.5">
             <Activity className="w-3.5 h-3.5 text-amber-400" /> USGS Quakes
           </span>
-          <span className="text-[10px] text-emerald-400 font-bold">API LIVE</span>
+          <span className="text-[10px] text-emerald-400 font-bold">{liveSeismic.length} LIVE</span>
         </button>
 
         <button
@@ -595,9 +709,9 @@ export default function GodsEyeMap({ stories, selectedStory, onSelectStory }) {
           }`}
         >
           <span className="flex items-center gap-1.5">
-            <Plane className="w-3.5 h-3.5 text-blue-400" /> ADS-B Planes
+            <Plane className="w-3.5 h-3.5 text-blue-400" /> ADS-B Flights
           </span>
-          <span className="text-[10px] text-emerald-400 font-bold">ONLINE</span>
+          <span className="text-[10px] text-emerald-400 font-bold">{liveFlights.length} LIVE</span>
         </button>
 
         <button
@@ -609,20 +723,22 @@ export default function GodsEyeMap({ stories, selectedStory, onSelectStory }) {
           <span className="flex items-center gap-1.5">
             <Ship className="w-3.5 h-3.5 text-sky-400" /> Maritime AIS
           </span>
-          <span className="text-[10px] text-emerald-400 font-bold">ONLINE</span>
+          <span className="text-[10px] text-sky-400 font-bold">4 AIS</span>
         </button>
 
         <button
           onClick={() => toggleLayer('satelliteThermal')}
-          className={`flex items-center justify-between gap-3 px-2 py-1 rounded transition-colors cursor-pointer ${
+          className={`flex items-center justify-between gap-3 px-2 py-1.5 rounded transition-colors cursor-pointer ${
             activeLayers.satelliteThermal ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'text-slate-500 hover:text-slate-300'
           }`}
         >
           <span className="flex items-center gap-1.5">
-            <Flame className="w-3.5 h-3.5 text-rose-400" /> NASA Thermal
+            <Flame className="w-3.5 h-3.5 text-rose-400" /> NASA Hazards
           </span>
-          <span className="text-[10px] text-rose-400 font-bold">375m</span>
+          <span className="text-[10px] text-rose-400 font-bold">{liveDisasters.length} LIVE</span>
         </button>
+          </div>
+        )}
       </div>
 
       {/* 3. INTERACTIVE INTELLIGENCE INSPECTOR CARD (Bottom Drawer) */}
@@ -637,16 +753,23 @@ export default function GodsEyeMap({ stories, selectedStory, onSelectStory }) {
                   ? 'bg-amber-950 text-amber-400 border border-amber-800'
                   : inspectedNode.type === 'flight'
                   ? 'bg-blue-950 text-blue-400 border border-blue-800'
+                  : inspectedNode.type === 'disaster'
+                  ? 'bg-orange-950 text-orange-400 border border-orange-800'
                   : 'bg-rose-950 text-rose-400 border border-rose-800'
               }`}>
                 {inspectedNode.kind === 'story' ? <MapPin className="w-4 h-4" /> :
                  inspectedNode.type === 'seismic' ? <Activity className="w-4 h-4" /> :
-                 inspectedNode.type === 'flight' ? <Plane className="w-4 h-4" /> : <Ship className="w-4 h-4" />}
+                 inspectedNode.type === 'flight' ? <Plane className="w-4 h-4" /> :
+                 inspectedNode.type === 'disaster' ? <Flame className="w-4 h-4" /> : <Ship className="w-4 h-4" />}
               </span>
 
               <div>
                 <span className="text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-wider block">
-                  {inspectedNode.kind === 'story' ? 'Verified Breaking Story' : `Physical Sensor Telemetry • ${inspectedNode.type.toUpperCase()}`}
+                  {inspectedNode.kind === 'story' 
+                    ? 'Verified Breaking Story' 
+                    : inspectedNode.type === 'disaster' 
+                    ? `NASA EONET Hazard • ${inspectedNode.data.disasterTitle || 'Active Hazard'}` 
+                    : `Physical Sensor Telemetry • ${inspectedNode.type.toUpperCase()}`}
                 </span>
                 <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-1">
                   {inspectedNode.kind === 'story' ? inspectedNode.data.title : inspectedNode.data.label}
@@ -661,6 +784,14 @@ export default function GodsEyeMap({ stories, selectedStory, onSelectStory }) {
               <X className="w-4 h-4" />
             </button>
           </div>
+
+          {/* Contested EW Zone Anti-Spoofing Alert */}
+          {inspectedNode.data.contestedZone && (
+            <div className="bg-amber-950/60 border border-amber-600/60 text-amber-300 text-[10px] p-2 rounded-lg font-mono flex items-start gap-1.5 my-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <span>{inspectedNode.data.antiSpoofingNote}</span>
+            </div>
+          )}
 
           <div className="space-y-2 text-xs font-sans text-slate-300 my-2.5">
             <p className="text-[11px] text-slate-300 leading-relaxed bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80">
@@ -703,7 +834,7 @@ export default function GodsEyeMap({ stories, selectedStory, onSelectStory }) {
                 rel="noreferrer"
                 className="text-cyan-400 hover:underline flex items-center gap-1 text-[11px]"
               >
-                <span>View Raw USGS Record</span>
+                <span>View Raw Sensor Record</span>
                 <ExternalLink className="w-3 h-3" />
               </a>
             ) : null}

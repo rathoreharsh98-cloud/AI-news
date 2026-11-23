@@ -1,13 +1,67 @@
 /**
  * VERITAS OSINT - LLM Consensus Engine (Step 4)
  * Multi-vector evidential consensus synthesis & Agentic RAG triangulation.
+ * Supports optional user-supplied BYO Gemini API Key with strict Safe Harbour
+ * (BNS Sec. 356 / IT Act Sec. 79) guardrails and instant deterministic fallback.
  * Benchmark: Google Staff Engineering / Deterministic Multi-Agent Verification Evaluator
  */
 
+const PROHIBITED_DEFAMATORY_REGEX = /\b(fake news|liar|liars|fraud|scam|hoax|propaganda|disinformation outlet|lying)\b/i;
+
 export class LLMConsensusEngine {
   constructor(options = {}) {
-    this.apiKey = options.apiKey || process.env.GEMINI_API_KEY || null;
-    this.modelName = options.modelName || 'gemini-1.5-pro-preview';
+    const envKey = typeof process !== 'undefined' && process.env ? process.env.GEMINI_API_KEY : null;
+    this.apiKey = options.apiKey || envKey || null;
+    this.modelName = options.modelName || 'gemini-2.5-flash';
+  }
+
+  /**
+   * Optional live BYO Gemini synthesis with strict Safe Harbour & 6s circuit breaker
+   */
+  async tryGeminiSynthesis(apiKey, { claimText, entities, wireResult, telemetryResult, corroborationResult }) {
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length < 10) return null;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelName}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+      const prompt = [
+        'You are the VERITAS OSINT Safe Harbour Consensus Analyst.',
+        'STRICT LEGAL RULE (India BNS Section 356 & IT Act Section 79): NEVER call any source or claim "fake", "fake news", "liars", "hoax", "fraud", or "propaganda". Output ONLY objective, probabilistic, evidence-based analysis in 2 concise sentences.',
+        `Claim: ${claimText}`,
+        `Location: ${entities?.location?.name || 'Unknown'}`,
+        `Corroboration Score: ${corroborationResult.score}% (${corroborationResult.status})`,
+        `Wire Sources: ${wireResult.sources.map(s => s.source).join(', ')}`,
+        `Telemetry Records: ${telemetryResult.records.map(r => `${r.system} [${r.status}]: ${r.details}`).join(' | ')}`
+      ].join('\n');
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 160 }
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) return null;
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (!text || text.length < 20) return null;
+
+      // Bar Raiser Safe Harbour Guardrail: Reject output if model slips into defamatory wording
+      if (PROHIBITED_DEFAMATORY_REGEX.test(text)) {
+        return null;
+      }
+
+      return text;
+    } catch {
+      clearTimeout(timeoutId);
+      return null;
+    }
   }
 
   /**
@@ -19,13 +73,14 @@ export class LLMConsensusEngine {
     wireResult,
     socialResult,
     telemetryResult,
-    corroborationResult
+    corroborationResult,
+    geminiApiKey = null
   }) {
     const isContradicted = telemetryResult.telemetryContradicted;
     const score = corroborationResult.score;
     const status = corroborationResult.status;
 
-    // Structured synthesis
+    // Deterministic baseline synthesis
     let executiveSummary = '';
     const pointsOfAgreement = [];
     const pointsOfDivergence = [];
@@ -52,6 +107,22 @@ export class LLMConsensusEngine {
       analystRecommendation = 'DEVELOPING. Ingest next scheduled orbital or ADS-B telemetry swath within 60 minutes.';
     }
 
+    // Optional BYO Gemini Enhancement (strictly opt-in via user key)
+    let aiProvider = 'Deterministic Agentic Consensus';
+    if (geminiApiKey) {
+      const geminiText = await this.tryGeminiSynthesis(geminiApiKey, {
+        claimText,
+        entities,
+        wireResult,
+        telemetryResult,
+        corroborationResult
+      });
+      if (geminiText) {
+        executiveSummary = geminiText;
+        aiProvider = `Gemini (${this.modelName} • BYO Key)`;
+      }
+    }
+
     const confidenceInterval = {
       lower: Math.max(0, score - 8),
       upper: Math.min(100, score + 6),
@@ -59,7 +130,8 @@ export class LLMConsensusEngine {
     };
 
     return {
-      consensusVersion: '3.0.0-agentic-rag',
+      consensusVersion: '3.1.0-agentic-rag',
+      aiProvider,
       executiveSummary,
       pointsOfAgreement,
       pointsOfDivergence,

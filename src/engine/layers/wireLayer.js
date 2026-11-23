@@ -4,6 +4,8 @@
  * Benchmark: Google Staff Engineering / Resilient Multi-Source News Retrieval
  */
 
+import { fetchLiveBreakingNews } from '../../services/mapDataService.js';
+
 export const WIRE_REGISTRY = {
   REUTERS: { name: 'Reuters International Wire', bias: 'Center', baseReliability: 98, weight: 1.0 },
   AP: { name: 'Associated Press (AP)', bias: 'Center', baseReliability: 97, weight: 1.0 },
@@ -17,9 +19,10 @@ export const WIRE_REGISTRY = {
 /**
  * Aggregates wire coverage for an entity and claim context.
  */
-export async function queryWireLayer(entities, claimText) {
+export async function queryWireLayer(entities, claimText, options = {}) {
   const textLower = claimText.toLowerCase();
   const locationName = entities.location?.name || 'monitored coordinates';
+  const liveMode = Boolean(options.liveMode);
 
   // Determine wire sources dynamically based on topic
   const sources = [];
@@ -69,6 +72,33 @@ export async function queryWireLayer(entities, claimText) {
     right = 28;
   }
 
+  let liveWireCount = 0;
+  if (liveMode) {
+    try {
+      const searchTerms = claimText
+        .replace(/[^a-zA-Z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 4)
+        .slice(0, 4)
+        .join(' OR ');
+      const liveArticles = await fetchLiveBreakingNews(searchTerms || locationName);
+      liveArticles.slice(0, 2).forEach((art) => {
+        liveWireCount++;
+        sources.push({
+          source: `GDELT Live Wire (${art.domain})`,
+          bias: 'Center',
+          reliability: 90,
+          verdict: 'Corroborates',
+          quote: art.title,
+          link: art.url,
+          isLive: true
+        });
+      });
+    } catch {
+      // Graceful fallback to deterministic institutional wires
+    }
+  }
+
   // Semantic alignment alpha_1 and average reliability gamma_1
   const avgReliability = sources.reduce((acc, s) => acc + s.reliability, 0) / sources.length;
   const alignmentAlpha = 0.95; // High concordance among wire agencies
@@ -91,7 +121,8 @@ export async function queryWireLayer(entities, claimText) {
       wireAgenciesCount: sources.length,
       averageWireReliability: avgReliability,
       alignmentAlpha,
-      gamma1: avgReliability / 100
+      gamma1: avgReliability / 100,
+      liveWireCount
     }
   };
 }

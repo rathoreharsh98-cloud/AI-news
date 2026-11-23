@@ -1,8 +1,27 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plane, Ship, Activity, Flame, ShieldCheck, Wifi } from 'lucide-react';
 import { OSINT_TELEMETRY_FEEDS } from '../data/mockNewsData';
+import { getLiveTelemetryCounts } from '../services/mapDataService';
 
 export default function TelemetryTicker() {
+  const [liveCounts, setLiveCounts] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    getLiveTelemetryCounts().then((counts) => {
+      if (mounted) setLiveCounts(counts);
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
+  const getDynamicSignals = (feed) => {
+    if (!liveCounts) return feed.signalsProcessed;
+    if (feed.type.includes('Seismic')) return `${liveCounts.quakesCount} Active Quakes (M4.5+)`;
+    if (feed.type.includes('Flight')) return `${liveCounts.flightsCount} Active Aircraft Vectors`;
+    if (feed.type.includes('Thermal')) return `${liveCounts.disastersCount} NASA EONET Hazards`;
+    return feed.signalsProcessed;
+  };
+
   const getIcon = (type) => {
     switch (type) {
       case 'ADS-B Flight Radar':
@@ -28,7 +47,7 @@ export default function TelemetryTicker() {
           </h3>
         </div>
         <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded">
-          ALL 5 STREAMS OPERATIONAL
+          {liveCounts ? `${liveCounts.liveStreamsOperational}/5 STREAMS LIVE` : 'ALL 5 STREAMS OPERATIONAL'}
         </span>
       </div>
 
@@ -48,7 +67,7 @@ export default function TelemetryTicker() {
               {feed.name}
             </div>
             <div className="flex items-center justify-between text-[9px] text-slate-500 pt-1 border-t border-slate-850">
-              <span>{feed.signalsProcessed}</span>
+              <span className="text-slate-300 font-medium">{getDynamicSignals(feed)}</span>
               <span className="text-cyan-400">{feed.latency}</span>
             </div>
           </div>
