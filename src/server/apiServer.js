@@ -14,8 +14,26 @@
 
 import http from 'node:http';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { executeVerificationPipeline } from '../engine/crossCheckEngine.js';
 import { defaultDataStore, VeritasDataStore, TTLCache } from './dataStore.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DIST_DIR = path.resolve(__dirname, '../../dist');
+
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+  '.webmanifest': 'application/manifest+json'
+};
 
 const PORT = process.env.PORT || 8081;
 const TELEMETRY_INGEST_URL = process.env.TELEMETRY_INGEST_URL || 'http://127.0.0.1:8082';
@@ -364,6 +382,25 @@ export async function handleApiRequest(req, res, store = defaultDataStore) {
     res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' });
     res.end(out);
     return;
+  }
+
+  // 9. Static Production PWA Bundle (dist/) for Unified Fullstack Hosting
+  if (req.method === 'GET' && !pathname.startsWith('/api') && fs.existsSync(DIST_DIR)) {
+    const safeRelPath = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+    const candidatePath = path.resolve(DIST_DIR, safeRelPath);
+    if (candidatePath.startsWith(DIST_DIR)) {
+      let targetFile = candidatePath;
+      if (!fs.existsSync(targetFile) || fs.statSync(targetFile).isDirectory()) {
+        targetFile = path.join(DIST_DIR, 'index.html');
+      }
+      if (fs.existsSync(targetFile) && fs.statSync(targetFile).isFile()) {
+        const ext = path.extname(targetFile).toLowerCase();
+        res.setHeader('Content-Type', MIME_TYPES[ext] || 'application/octet-stream');
+        res.writeHead(200);
+        fs.createReadStream(targetFile).pipe(res);
+        return;
+      }
+    }
   }
 
   res.setHeader('Content-Type', 'application/json');
