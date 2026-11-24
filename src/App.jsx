@@ -4,6 +4,7 @@ import LegalBanner from './components/LegalBanner';
 import TelemetryTicker from './components/TelemetryTicker';
 import SocialPulsePanel from './components/SocialPulsePanel';
 import GodsEyeMap from './components/GodsEyeMap';
+import ErrorBoundary from './components/ErrorBoundary';
 import NewsCard from './components/NewsCard';
 import VerificationDossier from './components/VerificationDossier';
 import SubmitClaimModal from './components/SubmitClaimModal';
@@ -12,6 +13,7 @@ import PitchDeckModal from './components/PitchDeckModal';
 import { INITIAL_STORIES } from './data/mockNewsData';
 import { fetchLiveBreakingNews } from './services/mapDataService';
 import { extractEntities } from './engine/claimExtractor';
+import { filterStories } from './engine/dossierExporter';
 import {
   Search,
   ShieldCheck,
@@ -23,7 +25,10 @@ import {
   RefreshCw,
   Newspaper,
   Map as MapIcon,
-  Presentation
+  Presentation,
+  Scale,
+  Cpu,
+  X
 } from 'lucide-react';
 
 function convertGdeltArticleToStory(art) {
@@ -82,10 +87,27 @@ function convertGdeltArticleToStory(art) {
   };
 }
 
+const BIAS_FILTERS = [
+  { id: 'ALL', label: 'All Bias' },
+  { id: 'LEFT', label: 'Left-Leaning' },
+  { id: 'CENTER', label: 'Center / Balanced' },
+  { id: 'RIGHT', label: 'Right-Leaning' },
+  { id: 'BLINDSPOT', label: 'Blindspots' }
+];
+
+const SENSOR_FILTERS = [
+  { id: 'ALL', label: 'All Sensors' },
+  { id: 'SEISMIC', label: 'Seismic (USGS)' },
+  { id: 'THERMAL', label: 'Thermal (NASA)' },
+  { id: 'AVIATION', label: 'Aviation (ADS-B)' },
+  { id: 'MARITIME', label: 'Maritime (AIS)' }
+];
+
 export default function App() {
   const [stories, setStories] = useState(INITIAL_STORIES);
   const [selectedStory, setSelectedStory] = useState(INITIAL_STORIES[0]);
   const [activeDossierStory, setActiveDossierStory] = useState(null);
+  const [initialDossierTab, setInitialDossierTab] = useState('dossier');
   const [liveGdeltCount, setLiveGdeltCount] = useState(0);
   const [isSyncingNews, setIsSyncingNews] = useState(false);
 
@@ -106,10 +128,12 @@ export default function App() {
   const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
   const [isPitchModalOpen, setIsPitchModalOpen] = useState(false);
 
-  // Filters & Layout
+  // Multi-Dimension Filters & Layout (Journey 3 - Option B)
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [biasFilter, setBiasFilter] = useState('ALL');
+  const [sensorFilter, setSensorFilter] = useState('ALL');
   const [viewMode, setViewMode] = useState('split'); // 'split' | 'map' | 'feed'
 
   useEffect(() => {
@@ -158,32 +182,44 @@ export default function App() {
     );
   };
 
-  const filteredStories = stories.filter((story) => {
-    if (savedOnly && !savedIds.includes(story.id)) return false;
+  const hasActiveFilters =
+    Boolean(searchQuery.trim()) ||
+    categoryFilter !== 'ALL' ||
+    statusFilter !== 'ALL' ||
+    biasFilter !== 'ALL' ||
+    sensorFilter !== 'ALL' ||
+    savedOnly;
 
-    const q = searchQuery.toLowerCase();
-    const matchesSearch =
-      !q ||
-      story.title.toLowerCase().includes(q) ||
-      story.summary.toLowerCase().includes(q) ||
-      story.location.name.toLowerCase().includes(q) ||
-      (story.entities?.who || []).some((w) => w.toLowerCase().includes(q));
+  const resetAllFilters = () => {
+    setSearchQuery('');
+    setCategoryFilter('ALL');
+    setStatusFilter('ALL');
+    setBiasFilter('ALL');
+    setSensorFilter('ALL');
+    setSavedOnly(false);
+  };
 
-    const matchesCategory = categoryFilter === 'ALL' || story.category === categoryFilter;
-    const matchesStatus = statusFilter === 'ALL' || story.status === statusFilter;
-
-    return matchesSearch && matchesCategory && matchesStatus;
+  const filteredStories = filterStories(stories, {
+    q: searchQuery,
+    category: categoryFilter,
+    status: statusFilter,
+    bias: biasFilter,
+    sensor: sensorFilter,
+    savedOnly,
+    savedIds
   });
 
   const handleClaimVerified = (newStory) => {
     setStories((prev) => [newStory, ...prev]);
     setSelectedStory(newStory);
+    setInitialDossierTab('dossier');
     setActiveDossierStory(newStory);
     setPrefillClaimText('');
   };
 
-  const handleOpenDossier = (story) => {
+  const handleOpenDossier = (story, tab = 'dossier') => {
     setSelectedStory(story);
+    setInitialDossierTab(tab);
     setActiveDossierStory(story);
   };
 
@@ -216,98 +252,176 @@ export default function App() {
         {/* Live Social Media Status & DPDP-Sanitized Pulse */}
         <SocialPulsePanel onVerifySocialPost={handleVerifySocialPost} />
 
-        {/* View Mode & Filter Controls */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-          {/* Search Bar */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search claims, entities, vessels, flight codes..."
-              className="w-full bg-slate-900 border border-slate-700/80 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono"
-            />
-          </div>
-
-          {/* Category, Saved & Status Filter Tabs */}
-          <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-            {/* Status Quick Filter */}
-            <div className="flex items-center bg-slate-900 p-1 rounded-lg border border-slate-800 overflow-x-auto">
-              <button
-                onClick={() => setStatusFilter('ALL')}
-                className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-                  statusFilter === 'ALL' ? 'bg-cyan-500 text-black' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setStatusFilter('CORROBORATED')}
-                className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-                  statusFilter === 'CORROBORATED' ? 'bg-emerald-500 text-black' : 'text-emerald-400 hover:text-emerald-300'
-                }`}
-              >
-                Corroborated
-              </button>
-              <button
-                onClick={() => setStatusFilter('DEVELOPING')}
-                className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-                  statusFilter === 'DEVELOPING' ? 'bg-amber-500 text-black' : 'text-amber-400 hover:text-amber-300'
-                }`}
-              >
-                Developing
-              </button>
-              <button
-                onClick={() => setStatusFilter('DISPUTED')}
-                className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-                  statusFilter === 'DISPUTED' ? 'bg-rose-500 text-black' : 'text-rose-400 hover:text-rose-300'
-                }`}
-              >
-                Disputed
-              </button>
+        {/* View Mode & Multi-Dimension Filter Console (Journey 3 - Option B) */}
+        <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 space-y-3">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            {/* Search Bar */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search claims, entities, vessels, flight codes..."
+                aria-label="Search breaking news claims and telemetry entities"
+                className="w-full bg-slate-900 border border-slate-700/80 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  aria-label="Clear search query"
+                  className="absolute right-2.5 top-2 text-slate-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
-            {/* Saved Bookmarks Toggle */}
-            <button
-              type="button"
-              onClick={() => setSavedOnly(!savedOnly)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer ${
-                savedOnly
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
-                  : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
-              }`}
-            >
-              <Bookmark className={`w-3.5 h-3.5 ${savedOnly ? 'fill-amber-400 text-amber-400' : 'text-amber-400'}`} />
-              <span>Saved ({savedIds.length})</span>
-            </button>
+            {/* Status, Saved & Layout Mode Controls */}
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+              {/* Status Quick Filter */}
+              <div className="flex items-center bg-slate-900 p-1 rounded-lg border border-slate-800 overflow-x-auto">
+                <button
+                  onClick={() => setStatusFilter('ALL')}
+                  className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                    statusFilter === 'ALL' ? 'bg-cyan-500 text-black' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setStatusFilter('CORROBORATED')}
+                  className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                    statusFilter === 'CORROBORATED'
+                      ? 'bg-emerald-500 text-black'
+                      : 'text-emerald-400 hover:text-emerald-300'
+                  }`}
+                >
+                  Corroborated
+                </button>
+                <button
+                  onClick={() => setStatusFilter('DEVELOPING')}
+                  className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                    statusFilter === 'DEVELOPING' ? 'bg-amber-500 text-black' : 'text-amber-400 hover:text-amber-300'
+                  }`}
+                >
+                  Developing
+                </button>
+                <button
+                  onClick={() => setStatusFilter('DISPUTED')}
+                  className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                    statusFilter === 'DISPUTED' ? 'bg-rose-500 text-black' : 'text-rose-400 hover:text-rose-300'
+                  }`}
+                >
+                  Disputed
+                </button>
+              </div>
 
-            {/* Layout Toggle (Split / Map / Feed) */}
-            <div className="hidden sm:flex items-center bg-slate-900 p-1 rounded-lg border border-slate-800">
+              {/* Saved Bookmarks Toggle */}
               <button
-                onClick={() => setViewMode('split')}
-                className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-                  viewMode === 'split' ? 'bg-slate-750 text-cyan-300 border border-slate-700' : 'text-slate-400 hover:text-white'
+                type="button"
+                onClick={() => setSavedOnly(!savedOnly)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer ${
+                  savedOnly
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                    : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
                 }`}
               >
-                Split View
+                <Bookmark className={`w-3.5 h-3.5 ${savedOnly ? 'fill-amber-400 text-amber-400' : 'text-amber-400'}`} />
+                <span>Saved ({savedIds.length})</span>
               </button>
-              <button
-                onClick={() => setViewMode('map')}
-                className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-                  viewMode === 'map' ? 'bg-slate-750 text-cyan-300 border border-slate-700' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Map Focus
-              </button>
-              <button
-                onClick={() => setViewMode('feed')}
-                className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-                  viewMode === 'feed' ? 'bg-slate-750 text-cyan-300 border border-slate-700' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Wire Feed
-              </button>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetAllFilters}
+                  className="px-2.5 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 text-[11px] font-semibold transition-colors cursor-pointer"
+                >
+                  Reset Filters
+                </button>
+              )}
+
+              {/* Layout Toggle (Split / Map / Feed) */}
+              <div className="hidden sm:flex items-center bg-slate-900 p-1 rounded-lg border border-slate-800">
+                <button
+                  onClick={() => setViewMode('split')}
+                  className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                    viewMode === 'split'
+                      ? 'bg-slate-750 text-cyan-300 border border-slate-700'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Split View
+                </button>
+                <button
+                  onClick={() => setViewMode('map')}
+                  className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                    viewMode === 'map'
+                      ? 'bg-slate-750 text-cyan-300 border border-slate-700'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Map Focus
+                </button>
+                <button
+                  onClick={() => setViewMode('feed')}
+                  className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                    viewMode === 'feed'
+                      ? 'bg-slate-750 text-cyan-300 border border-slate-700'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Wire Feed
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Bias Spectrum & Physical Sensor Drilldown Filters (Journey 3 - Option B) */}
+          <div className="pt-2 border-t border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs font-mono">
+            {/* Bias Spectrum Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+              <span className="flex items-center gap-1 text-slate-400 text-[11px] uppercase mr-1 whitespace-nowrap">
+                <Scale className="w-3.5 h-3.5 text-purple-400" />
+                Bias:
+              </span>
+              {BIAS_FILTERS.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => setBiasFilter(b.id)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                    biasFilter === b.id
+                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/50'
+                      : 'bg-slate-900/70 text-slate-400 border border-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Physical Sensor Layer Drilldown Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+              <span className="flex items-center gap-1 text-slate-400 text-[11px] uppercase mr-1 whitespace-nowrap">
+                <Cpu className="w-3.5 h-3.5 text-cyan-400" />
+                Sensor:
+              </span>
+              {SENSOR_FILTERS.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSensorFilter(s.id)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                    sensorFilter === s.id
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50'
+                      : 'bg-slate-900/70 text-slate-400 border border-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -353,16 +467,25 @@ export default function App() {
               </div>
 
               {filteredStories.length === 0 ? (
-                <div className="bg-slate-950 p-8 rounded-xl border border-slate-800 text-center space-y-2">
+                <div className="bg-slate-950 p-8 rounded-xl border border-slate-800 text-center space-y-3">
                   <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto" />
                   <p className="text-sm font-semibold text-slate-300">
-                    {savedOnly ? 'No bookmarked dossiers yet.' : 'No events match the selected criteria.'}
+                    {savedOnly ? 'No bookmarked dossiers yet.' : 'No events match the selected filter criteria.'}
                   </p>
                   <p className="text-xs text-slate-500 font-mono">
                     {savedOnly
                       ? 'Tap the bookmark icon on any story card or dossier to save it locally.'
-                      : 'Try adjusting your keyword search or category filters.'}
+                      : 'Try clearing your keyword search, bias spectrum, or sensor drilldown filters.'}
                   </p>
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      onClick={resetAllFilters}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 text-xs font-mono font-semibold cursor-pointer"
+                    >
+                      Reset All Filters
+                    </button>
+                  )}
                 </div>
               ) : (
                 filteredStories.map((story) => (
@@ -370,7 +493,8 @@ export default function App() {
                     key={story.id}
                     story={story}
                     isSelected={selectedStory?.id === story.id}
-                    onSelect={() => handleOpenDossier(story)}
+                    onSelect={() => handleOpenDossier(story, 'dossier')}
+                    onShare={() => handleOpenDossier(story, 'share')}
                     isSaved={savedIds.includes(story.id)}
                     onToggleSave={handleToggleSave}
                   />
@@ -392,11 +516,13 @@ export default function App() {
                 </span>
               </div>
 
-              <GodsEyeMap
-                stories={stories}
-                selectedStory={selectedStory}
-                onSelectStory={handleOpenDossier}
-              />
+              <ErrorBoundary fallbackTitle="God's Eye Map Sensor Visualizer">
+                <GodsEyeMap
+                  stories={filteredStories.length > 0 ? filteredStories : stories}
+                  selectedStory={selectedStory}
+                  onSelectStory={(story) => handleOpenDossier(story, 'dossier')}
+                />
+              </ErrorBoundary>
             </div>
           )}
         </div>
@@ -412,15 +538,24 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4 text-slate-400 flex-wrap justify-center">
-            <button onClick={() => setIsLegalModalOpen(true)} className="hover:text-cyan-400 transition-colors cursor-pointer">
+            <button
+              onClick={() => setIsLegalModalOpen(true)}
+              className="hover:text-cyan-400 transition-colors cursor-pointer"
+            >
               Section 79 IT Act Disclaimers
             </button>
             <span>•</span>
-            <button onClick={() => setIsLegalModalOpen(true)} className="hover:text-cyan-400 transition-colors cursor-pointer">
+            <button
+              onClick={() => setIsLegalModalOpen(true)}
+              className="hover:text-cyan-400 transition-colors cursor-pointer"
+            >
               DPDP Act 2023 Compliance
             </button>
             <span>•</span>
-            <button onClick={() => setIsLegalModalOpen(true)} className="hover:text-cyan-400 transition-colors cursor-pointer">
+            <button
+              onClick={() => setIsLegalModalOpen(true)}
+              className="hover:text-cyan-400 transition-colors cursor-pointer"
+            >
               Grievance Officer
             </button>
           </div>
@@ -503,6 +638,7 @@ export default function App() {
       {activeDossierStory && (
         <VerificationDossier
           story={activeDossierStory}
+          initialTab={initialDossierTab}
           onClose={() => setActiveDossierStory(null)}
           onPanToLocation={(story) => {
             setSelectedStory(story);
@@ -522,16 +658,10 @@ export default function App() {
       />
 
       {/* MODAL 3: Legal & Grievance Redressal Modal */}
-      <LegalGuardrailsModal
-        isOpen={isLegalModalOpen}
-        onClose={() => setIsLegalModalOpen(false)}
-      />
+      <LegalGuardrailsModal isOpen={isLegalModalOpen} onClose={() => setIsLegalModalOpen(false)} />
 
       {/* MODAL 4: Investor Pitch Deck & Live Simulator */}
-      <PitchDeckModal
-        isOpen={isPitchModalOpen}
-        onClose={() => setIsPitchModalOpen(false)}
-      />
+      <PitchDeckModal isOpen={isPitchModalOpen} onClose={() => setIsPitchModalOpen(false)} />
     </div>
   );
 }

@@ -10,10 +10,11 @@ import {
   ShieldCheck,
   Zap,
   Radio,
-  Bookmark
+  Bookmark,
+  Share2
 } from 'lucide-react';
 
-export default function NewsCard({ story, isSelected, onSelect, isSaved = false, onToggleSave }) {
+export default function NewsCard({ story, isSelected, onSelect, onShare, isSaved = false, onToggleSave }) {
   const getStatusBadge = () => {
     switch (story.status) {
       case 'CORROBORATED':
@@ -106,6 +107,20 @@ export default function NewsCard({ story, isSelected, onSelect, isSaved = false,
             <Clock className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
             <time dateTime={story.utcTimestamp || ''}>{story.timestamp}</time>
           </span>
+          {onShare && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onShare(story);
+              }}
+              aria-label="Open shareable verification card"
+              title="Share tactical verification card"
+              className="p-1.5 rounded-lg border bg-slate-900 text-slate-400 border-slate-800 hover:text-cyan-300 hover:border-cyan-500/40 transition-colors cursor-pointer"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+            </button>
+          )}
           {onToggleSave && (
             <button
               type="button"

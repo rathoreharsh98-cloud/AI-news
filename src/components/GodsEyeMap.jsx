@@ -586,10 +586,10 @@ export default function GodsEyeMap({ stories, selectedStory, onSelectStory }) {
           </button>
 
           <button
-            onClick={loadLiveEarthquakes}
+            onClick={loadLiveTelemetry}
             disabled={isRefreshing}
             className="p-1 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border border-slate-700 rounded-lg transition-colors cursor-pointer"
-            title="Refresh Live USGS API Feeds"
+            title="Refresh Live USGS, EONET & OpenSky Feeds"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
           </button>
