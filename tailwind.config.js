@@ -17,12 +17,12 @@ export default {
           700: '#1e2942',
           600: '#2b3a5c',
           accent: '#00f0ff',
-          neonGreen: '#00ff66',
-          neonAmber: '#ffb703',
-          neonRed: '#ff3366',
-          purple: '#8b5cf6',
+          neonGreen: '#10b981',
+          neonAmber: '#f59e0b',
+          neonRed: '#f43f5e',
+          steel: '#94a3b8',
           biasLeft: '#3b82f6',
-          biasCenter: '#a855f7',
+          biasCenter: '#94a3b8',
           biasRight: '#f43f5e'
         }
       },

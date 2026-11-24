@@ -4,15 +4,15 @@
 
 :root {
   --color-bg-base: #080b11;
-  --color-bg-card: #0f1420;
-  --color-bg-subtle: #141b2d;
+  --color-bg-card: #0d121c;
+  --color-bg-subtle: #131a29;
   --color-border-subtle: #1e293b;
   --color-border-focus: #00f0ff;
-  --color-status-corroborated: #00ff66;
-  --color-status-developing: #ffb703;
-  --color-status-disputed: #ff3366;
+  --color-status-corroborated: #10b981;
+  --color-status-developing: #f59e0b;
+  --color-status-disputed: #f43f5e;
   --color-bias-left: #3b82f6;
-  --color-bias-center: #a855f7;
+  --color-bias-center: #94a3b8;
   --color-bias-right: #f43f5e;
 }
 

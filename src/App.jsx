@@ -253,18 +253,18 @@ export default function App() {
         <SocialPulsePanel onVerifySocialPost={handleVerifySocialPost} />
 
         {/* View Mode & Multi-Dimension Filter Console (Journey 3 - Option B) */}
-        <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 space-y-3">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="bg-[#0d121c] p-3 rounded-lg border border-slate-800/90 space-y-2.5">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
             {/* Search Bar */}
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+              <Search className="absolute left-3 top-2 w-4 h-4 text-slate-500" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search claims, entities, vessels, flight codes..."
                 aria-label="Search breaking news claims and telemetry entities"
-                className="w-full bg-slate-900 border border-slate-700/80 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono"
+                className="w-full bg-[#080b11] border border-slate-800 rounded-md pl-9 pr-8 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono"
               />
               {searchQuery && (
                 <button
@@ -343,13 +343,13 @@ export default function App() {
               )}
 
               {/* Layout Toggle (Split / Map / Feed) */}
-              <div className="hidden sm:flex items-center bg-slate-900 p-1 rounded-lg border border-slate-800">
+              <div className="hidden sm:flex items-center bg-[#080b11] p-1 rounded-md border border-slate-800">
                 <button
                   onClick={() => setViewMode('split')}
                   className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
                     viewMode === 'split'
-                      ? 'bg-slate-750 text-cyan-300 border border-slate-700'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/40'
+                      : 'text-slate-400 hover:text-white border border-transparent'
                   }`}
                 >
                   Split View
@@ -358,8 +358,8 @@ export default function App() {
                   onClick={() => setViewMode('map')}
                   className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
                     viewMode === 'map'
-                      ? 'bg-slate-750 text-cyan-300 border border-slate-700'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/40'
+                      : 'text-slate-400 hover:text-white border border-transparent'
                   }`}
                 >
                   Map Focus
@@ -368,8 +368,8 @@ export default function App() {
                   onClick={() => setViewMode('feed')}
                   className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
                     viewMode === 'feed'
-                      ? 'bg-slate-750 text-cyan-300 border border-slate-700'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/40'
+                      : 'text-slate-400 hover:text-white border border-transparent'
                   }`}
                 >
                   Wire Feed
@@ -383,7 +383,7 @@ export default function App() {
             {/* Bias Spectrum Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
               <span className="flex items-center gap-1 text-slate-400 text-[11px] uppercase mr-1 whitespace-nowrap">
-                <Scale className="w-3.5 h-3.5 text-purple-400" />
+                <Scale className="w-3.5 h-3.5 text-cyan-400" />
                 Bias:
               </span>
               {BIAS_FILTERS.map((b) => (
@@ -393,8 +393,8 @@ export default function App() {
                   onClick={() => setBiasFilter(b.id)}
                   className={`px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                     biasFilter === b.id
-                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/50'
-                      : 'bg-slate-900/70 text-slate-400 border border-slate-800 hover:text-slate-200'
+                      ? 'bg-slate-800 text-slate-100 border border-slate-600'
+                      : 'bg-[#080b11] text-slate-400 border border-slate-800 hover:text-slate-200'
                   }`}
                 >
                   {b.label}
@@ -626,7 +626,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => setIsPitchModalOpen(true)}
-            className="flex flex-col items-center justify-center py-1.5 rounded-lg text-purple-300"
+            className="flex flex-col items-center justify-center py-1.5 rounded-lg text-slate-300 hover:text-cyan-300"
           >
             <Presentation className="w-4 h-4 mb-0.5" />
             <span>Deck</span>

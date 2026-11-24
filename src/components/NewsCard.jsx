@@ -82,10 +82,10 @@ export default function NewsCard({ story, isSelected, onSelect, onShare, isSaved
       aria-expanded={isSelected}
       onClick={() => onSelect(story)}
       onKeyDown={handleKeyDown}
-      className={`group relative bg-[#0f1420]/95 backdrop-blur-md rounded-xl p-4 sm:p-5 border transition-all duration-200 cursor-pointer shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080b11] ${
+      className={`group relative bg-[#0d121c] rounded-lg p-4 sm:p-5 border transition-all duration-150 cursor-pointer hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#080b11] ${
         isSelected 
-          ? 'border-cyan-400 shadow-[0_0_24px_rgba(0,240,255,0.22)] bg-[#141b2d]' 
-          : 'border-slate-800/90 hover:border-slate-700 hover:bg-[#141b2d]/80 shadow-md'
+          ? 'border-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.16)] bg-[#131a29]' 
+          : 'border-slate-800/90 hover:border-slate-700 hover:bg-[#131a29]/80'
       }`}
     >
       {/* Top Meta Header */}
@@ -94,7 +94,7 @@ export default function NewsCard({ story, isSelected, onSelect, onShare, isSaved
           {getStatusBadge()}
           {story.isLiveGdelt && (
             <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/40">
-              <Radio className="w-3 h-3 animate-pulse" aria-hidden="true" />
+              <Radio className="w-3 h-3" aria-hidden="true" />
               LIVE GDELT
             </span>
           )}
@@ -185,7 +185,7 @@ export default function NewsCard({ story, isSelected, onSelect, onShare, isSaved
           />
           <div 
             style={{ width: `${story.biasDistribution.center}%` }} 
-            className="bg-purple-500 hover:opacity-80 transition-opacity" 
+            className="bg-slate-400 hover:opacity-80 transition-opacity" 
             title={`Center / Wire media: ${story.biasDistribution.center}%`}
           />
           <div 
@@ -203,8 +203,8 @@ export default function NewsCard({ story, isSelected, onSelect, onShare, isSaved
               Left: <strong className="text-blue-400">{story.biasDistribution.left}%</strong>
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-purple-500" aria-hidden="true"></span>
-              Center: <strong className="text-purple-400">{story.biasDistribution.center}%</strong>
+              <span className="w-2 h-2 rounded-full bg-slate-400" aria-hidden="true"></span>
+              Center: <strong className="text-slate-300">{story.biasDistribution.center}%</strong>
             </span>
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-rose-500" aria-hidden="true"></span>
@@ -231,7 +231,7 @@ export default function NewsCard({ story, isSelected, onSelect, onShare, isSaved
           <span className="truncate font-semibold">{story.parallelVerification.mainstreamWire.length} Outlets</span>
         </div>
         <div className="bg-[#080b11] border border-slate-800/80 rounded px-2 py-1.5 flex items-center justify-center gap-1 text-slate-300">
-          <span className="text-purple-400 font-bold">2. Social:</span>
+          <span className="text-slate-300 font-bold">2. Social:</span>
           <span className="truncate font-semibold text-emerald-400">PII Scrubbed</span>
         </div>
         <div className="bg-[#080b11] border border-slate-800/80 rounded px-2 py-1.5 flex items-center justify-center gap-1 text-slate-300">
